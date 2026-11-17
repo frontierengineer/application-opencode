@@ -1,0 +1,33 @@
+{
+  "en": {
+    "probe.missing": "OpenCode is not installed on this worker yet. It is installed automatically.",
+    "probe.installing": "Installing OpenCode on this worker.",
+    "probe.install_failed": "Installing OpenCode on this worker did not finish: {reason}. It is tried again in {minutes} min.",
+    "probe.broken": "OpenCode at {path} does not start: {reason}. Reinstall it, or remove it so it is installed automatically.",
+    "probe.could_not_run": "Checking OpenCode on this worker did not finish: {reason}.",
+    "install.failed": "Installing OpenCode did not finish: {reason}.",
+    "install.not_found_after": "npm finished, but OpenCode is not where it was installed",
+    "launch.missing": "OpenCode is not installed on this worker yet. It is installed automatically, then the session starts.",
+    "status.about_heading": "What OpenCode needs",
+    "status.about": "OpenCode works at once with its free models, with nothing to sign in to. To use your own model provider, such as Anthropic, OpenAI or a local model, sign in to it once on each worker in OpenCode itself. Frontier installs OpenCode on every worker and never holds your sign-in.",
+    "status.workers_heading": "OpenCode on your workers",
+    "status.column_worker": "Worker",
+    "status.column_status": "Status",
+    "status.column_models": "Models",
+    "status.ready": "Ready",
+    "status.not_ready": "Not ready",
+    "status.offline": "Offline",
+    "status.not_reported": "Not reported",
+    "status.not_reported_reason": "This worker has not reported on OpenCode yet.",
+    "status.no_models": "None listed yet",
+    "status.no_workers_heading": "No workers yet",
+    "status.no_workers": "OpenCode runs on workers. Pair a worker from the Workers view, and it shows here.",
+    "status.signin_heading": "Adding a model provider on a worker",
+    "status.signin_step_terminal": "Open a terminal on the worker from the Workers view.",
+    "status.signin_step_run": "Run",
+    "status.signin_step_done": "Choose the provider and sign in. Its models show here within a few minutes.",
+    "status.signin_alternative": "A provider's key in the worker's environment, such as `ANTHROPIC_API_KEY`, works too once the worker is restarted.",
+    "status.copy": "Copy command",
+    "status.copied": "Command copied."
+  }
+}
