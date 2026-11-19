@@ -19,12 +19,15 @@ export async function locateNpm(machine: Machine): Promise<Command | null> {
   }
 }
 
+// npm on a slow registry takes minutes; one that has stalled is killed.
+const installTimeoutMilliseconds = 10 * 60 * 1000;
+
 export type InstallOutcome = { ok: true } | { ok: false; reason: string };
 
 export async function npmInstall(machine: Machine, prefix: string, specification: string): Promise<InstallOutcome> {
   const npm = await locateNpm(machine);
   if (!npm) return { ok: false, reason: 'npm is not on this worker' };
-  const ran = await run(machine, npm, ['install', '--prefix', prefix, '--no-audit', '--no-fund', '--no-update-notifier', '--loglevel=error', specification], { cwd: machine.env.HOME });
+  const ran = await run(machine, npm, ['install', '--prefix', prefix, '--no-audit', '--no-fund', '--no-update-notifier', '--loglevel=error', specification], { cwd: machine.env.HOME, timeoutMilliseconds: installTimeoutMilliseconds });
   if (ran.error) return { ok: false, reason: ran.error };
   if (ran.code !== 0) return { ok: false, reason: lastLines(ran.stderr || ran.stdout) || `npm exited with code ${ran.code}` };
   return { ok: true };

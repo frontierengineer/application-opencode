@@ -70,7 +70,14 @@ export interface Ran {
   error: string | null;
 }
 
-export function run(machine: Machine, command: Command, args: readonly string[], options: { cwd?: string; env?: Record<string, string> } = {}): Promise<Ran> {
+export interface RunOptions {
+  cwd?: string;
+  env?: Record<string, string>;
+  // Killed when it runs longer, and answered with an error saying so.
+  timeoutMilliseconds: number;
+}
+
+export function run(machine: Machine, command: Command, args: readonly string[], options: RunOptions): Promise<Ran> {
   return new Promise((done) => {
     const path = [dirname(machine.execPath), machine.env.PATH ?? ''].filter(Boolean).join(delimiter);
     const child = spawn(command.command, [...command.args, ...args], {
@@ -84,8 +91,13 @@ export function run(machine: Machine, command: Command, args: readonly string[],
     const settle = (ran: Ran) => {
       if (settled) return;
       settled = true;
+      clearTimeout(deadline);
       done(ran);
     };
+    const deadline = setTimeout(() => {
+      child.kill('SIGKILL');
+      settle({ code: null, stdout, stderr, error: `it did not finish within ${Math.round(options.timeoutMilliseconds / 1000)} s` });
+    }, options.timeoutMilliseconds);
     child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString('utf8')));
     child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
     child.on('error', (error) => settle({ code: null, stdout, stderr, error: error.message }));

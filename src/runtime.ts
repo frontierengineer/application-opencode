@@ -73,7 +73,7 @@ export function createOpenCodeRuntime(context: RuntimeContext, machine: Machine 
     const mtime = (await stat(binary.command.args[0] ?? binary.command.command).catch(() => null))?.mtimeMs ?? 0;
     const known = versions.get(binary.path);
     if (known && known.mtime === mtime) return known;
-    const ran = await run(machine, binary.command, ['--version']);
+    const ran = await run(machine, binary.command, ['--version'], { timeoutMilliseconds: 15_000 });
     const version = ran.code === 0 ? ran.stdout.trim().split('\n').pop() ?? null : null;
     const problem = ran.code === 0 ? null : ran.error ?? (lastLines(ran.stderr || ran.stdout) || `exit code ${ran.code}`);
     const result = { mtime, version, problem };
@@ -98,8 +98,8 @@ export function createOpenCodeRuntime(context: RuntimeContext, machine: Machine 
     if (!force && machine.now() - refreshFailedAt < retryRefreshAfterMilliseconds) return Promise.resolve();
     refreshing = (async () => {
       try {
-        let ran = await run(machine, binary.command, ['models', '--verbose'], { cwd: context.directories.scratch });
-        if (ran.code !== 0) ran = await run(machine, binary.command, ['models'], { cwd: context.directories.scratch });
+        let ran = await run(machine, binary.command, ['models', '--verbose'], { cwd: context.directories.scratch, timeoutMilliseconds: 60_000 });
+        if (ran.code !== 0) ran = await run(machine, binary.command, ['models'], { cwd: context.directories.scratch, timeoutMilliseconds: 60_000 });
         if (ran.code !== 0) throw new Error(ran.error ?? (lastLines(ran.stderr) || `exit code ${ran.code}`));
         const models = toRuntimeModels(parseModels(ran.stdout));
         if (models.length === 0) throw new Error('OpenCode listed no models');
