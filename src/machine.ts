@@ -21,12 +21,6 @@ export function homeOf(machine: Machine): string {
   return machine.env.HOME || machine.env.USERPROFILE || homedir();
 }
 
-export function expandHome(machine: Machine, path: string): string {
-  if (path === '~') return homeOf(machine);
-  if (path.startsWith('~/')) return join(homeOf(machine), path.slice(2));
-  return path;
-}
-
 async function executable(path: string): Promise<boolean> {
   try {
     await access(path, constants.X_OK);
