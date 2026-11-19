@@ -5,6 +5,9 @@ workers. It is one of Frontier's Initial Applications, written against
 Frontier's Application Interface (`interfaces/application.d.ts`) like any other
 Application.
 
+Its id is `github.com/frontierengineer/application-opencode`, the repository it
+is published from.
+
 OpenCode works at once with its free models, with nothing to sign in to. To use
 your own model provider, you sign in to it once on each worker in OpenCode
 itself, with `opencode auth login`. The Runtime never holds or asks for a
@@ -17,9 +20,9 @@ On every worker, the worker bundle:
 - **Probes** whether OpenCode is there and starts, and which models it offers.
   An `opencode` on the PATH or in `~/.opencode/bin` is used as it is.
 - **Installs** `opencode-ai`, at the version this Application pins, into its own
-  directory on the worker with npm when no OpenCode is found. A failed install
-  is tried again after 1, 4, 16, then every 60 minutes, and its reason shows
-  meanwhile.
+  directory on the worker with npm when no OpenCode is found. npm is given 10
+  minutes; a failed or stalled install is tried again after 1, 4, 16, then every
+  60 minutes, and its reason shows meanwhile.
 - **Lists models** with `opencode models --verbose` in the background, again
   whenever the sign-ins change and otherwise every 12 hours. Models are grouped
   by provider and family, newest first, each with its context window and its
@@ -37,8 +40,13 @@ The session's model, its variant and the agent definition reach OpenCode as
 - A variant is set on that agent, or on the `build` agent when there is no
   definition.
 
+Every process the Runtime runs has a deadline, so a probe always answers:
+`opencode --version` is given 15 seconds and `opencode models` 60.
+
 The surface bundle's **configuration view** shows OpenCode's state on every
-worker, its models, and how to add a model provider.
+worker, its models, and how to add a model provider. It is plain HTML and
+`frontier-*` elements, drawn by Frontier's Design System in the person's own
+appearance.
 
 ## Layout
 
@@ -49,22 +57,38 @@ worker, its models, and how to add a model provider.
 | `src/config.ts` | The session's model, variant and agent definition as OpenCode config. |
 | `src/models.ts` | Reading `opencode models` into the interface's models. |
 | `src/definition.ts` | Reading an agent definition's front matter. |
-| `src/installer.ts`, `src/machine.ts` | Finding npm and running installs once at a time. |
+| `src/installer.ts`, `src/machine.ts` | Finding npm, running installs once at a time, and running processes with a deadline. |
 | `surface.ts`, `src/status-view.ts` | The configuration view. |
 | `translations.json` | Every message a person reads, by token. |
-| `test/` | Unit tests, with a fake npm and a fake `opencode` that speaks ACP. |
+| `test/` | Unit tests, with a fake npm and a fake `opencode` that speaks ACP, and a browser test of the configuration view. |
 
-## Checking it
+## Developing
+
+The Application is checked the way it ships, against a Frontier checkout:
 
 ```sh
-node scripts/check.mjs
+npm test            # or: node scripts/check.mjs
 ```
 
-It type-checks the sources against a Frontier checkout's Application Interface,
-runs the tests with Node's test runner, and bundles each entry file the way the
-Host does. It looks for the checkout at `../../frontier`, or at `FRONTIER_REPO`.
-No test installs anything from the network or calls a model.
+It type-checks every bundle against the checkout's Application Interface
+(`interfaces/application.d.ts`), runs the tests with Node's test runner, and
+bundles each entry file the way the Host does. It finds the checkout at
+`../../frontier` (a `frontier` beside the directory holding this repository), or
+at `FRONTIER_REPO`, and borrows TypeScript, esbuild, Playwright and Node's types from it,
+so that checkout's dependencies must be installed. It needs Node.js 22.6 or
+later. No test reaches the network, calls a model or installs anything: npm and OpenCode are fakes under `test/fixtures/`.
+
+The browser test draws the configuration view inside the Design System the
+checkout provides, in the dark and the light scheme; with `VIEW_SHOTS=<directory>`
+it keeps a screenshot of each.
+
+To try it in Frontier itself, put this repository in the `applications`
+directory beside a Frontier checkout, as `opencode`; a Source Build of that
+checkout carries every Application there as an Initial Application, so a new
+install starts with it. From the checkout, `bash modcon/scripts/tool.sh ui
+--remake --applications <that directory>` makes the Electron app with them and
+photographs it.
 
 ## License
 
-MIT
+MIT, as `LICENSE` states.
