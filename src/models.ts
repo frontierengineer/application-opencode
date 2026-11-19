@@ -48,7 +48,7 @@ export function variantField(variants: readonly string[]): Field {
     type: 'select',
     key: 'variant',
     label: 'Variant',
-    description: "The model's reasoning effort, as OpenCode names it.",
+    description: 'How much the model reasons before it answers.',
     choices: variants.map((variant) => ({ value: variant, label: words(variant) })),
   };
 }

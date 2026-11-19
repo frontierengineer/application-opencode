@@ -51,7 +51,7 @@ test('a worker without OpenCode reports it missing, install puts the pinned vers
           type: 'select',
           key: 'variant',
           label: 'Variant',
-          description: "The model's reasoning effort, as OpenCode names it.",
+          description: 'How much the model reasons before it answers.',
           choices: [{ value: 'low', label: 'Low' }, { value: 'high', label: 'High' }],
         }],
       }],
