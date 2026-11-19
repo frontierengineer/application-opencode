@@ -1,43 +1,34 @@
 import type { ConfigurationContext, Runtime, Worker } from '../../application';
-import { h, style, withCode } from './dom.ts';
+import { h, icon, style, withCode } from './dom.ts';
 import { text } from './text.ts';
 
+// The Design System draws everything here; this only bounds the line length.
 const css = `
-.runtime-status { display: grid; gap: var(--frontier-space-5, 24px); max-width: 64rem; padding: var(--frontier-space-4, 16px); }
-.runtime-status section { display: grid; gap: var(--frontier-space-3, 12px); }
-.runtime-status > *, .runtime-status section > *, .runtime-status li > *, .runtime-status td > * { margin-block: 0; }
-.runtime-status table { width: 100%; border-collapse: collapse; }
-.runtime-status th, .runtime-status td { text-align: start; vertical-align: top; padding: var(--frontier-space-2, 8px) var(--frontier-space-3, 12px); }
-.runtime-status tbody tr:nth-child(odd) { background: var(--frontier-color-surface, rgba(127, 127, 127, 0.06)); }
-.runtime-status .reason { color: var(--frontier-color-text-muted, inherit); margin: var(--frontier-space-1, 4px) 0 0; }
-.runtime-status .chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 0.875em; font-weight: 600; background: var(--frontier-color-fill, rgba(127, 127, 127, 0.14)); }
-.runtime-status .chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.runtime-status .chip[data-tone="success"] { color: var(--frontier-color-success, #2f9e44); }
-.runtime-status .chip[data-tone="warning"] { color: var(--frontier-color-warning, #b8860b); }
-.runtime-status .chip[data-tone="muted"] { color: var(--frontier-color-text-muted, #777); }
-.runtime-status .models { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
-.runtime-status .command { display: flex; gap: var(--frontier-space-2, 8px); align-items: center; flex-wrap: wrap; }
-.runtime-status .command code { padding: 4px 8px; border-radius: 6px; background: var(--frontier-color-fill, rgba(127, 127, 127, 0.14)); }
-.runtime-status .empty { display: grid; justify-items: start; gap: var(--frontier-space-2, 8px); padding: var(--frontier-space-5, 24px); border-radius: 12px; background: var(--frontier-color-surface, rgba(127, 127, 127, 0.06)); }
+.runtime-status { max-inline-size: 64rem; }
+.runtime-status td { vertical-align: top; }
 `;
+
+const workersIcon = 'M4 5h16v10H4zM8 19h8M12 15v4';
 
 export interface StatusCopy {
   signInCommand: string;
 }
 
-type Row = { worker: Worker; tone: 'success' | 'warning' | 'muted'; status: string; reason: string | null; models: string[] };
+type Tone = 'success' | 'warning' | 'muted';
+type Row = { worker: Worker; tone: Tone; status: string; reason: string | null; models: string[] };
 
 export function mountRuntimeStatus(context: ConfigurationContext, copy: StatusCopy): void {
   const t = (token: string, values: Record<string, string | number> = {}) => text(context, token, values);
-  const tableBody = h('tbody');
   const workersSection = h('section', { 'aria-labelledby': 'workers-heading' });
-  const live = h('p', { role: 'status', class: 'reason' });
+  const live = h('div', { role: 'status', 'data-tone': 'success' });
   let copied: number | undefined;
 
   const copyButton = h('button', {
     type: 'button',
+    'data-size': 'small',
     onclick: async () => {
       const answer = await context.clipboard.copy(copy.signInCommand);
+      live.dataset.tone = answer.ok ? 'success' : 'danger';
       live.textContent = answer.ok ? t('status.copied') : answer.message;
       window.clearTimeout(copied);
       copied = window.setTimeout(() => (live.textContent = ''), 4000);
@@ -46,21 +37,25 @@ export function mountRuntimeStatus(context: ConfigurationContext, copy: StatusCo
 
   document.body.append(
     style(css),
-    h('main', { class: 'runtime-status' },
+    h('frontier-stack', { class: 'runtime-status', padding: '5', gap: '6' },
       h('section', { 'aria-labelledby': 'about-heading' },
-        h('h2', { id: 'about-heading' }, t('status.about_heading')),
-        h('p', {}, ...withCode(t('status.about'))),
+        h('frontier-stack', { gap: '2' },
+          h('h3', { id: 'about-heading' }, t('status.about_heading')),
+          h('p', {}, ...withCode(t('status.about'))),
+        ),
       ),
       workersSection,
       h('section', { 'aria-labelledby': 'signin-heading' },
-        h('h2', { id: 'signin-heading' }, t('status.signin_heading')),
-        h('ol', {},
-          h('li', {}, ...withCode(t('status.signin_step_terminal'))),
-          h('li', {}, h('div', { class: 'command' }, h('span', {}, t('status.signin_step_run')), h('code', {}, copy.signInCommand), copyButton)),
-          h('li', {}, ...withCode(t('status.signin_step_done'))),
+        h('frontier-stack', { gap: '3' },
+          h('h3', { id: 'signin-heading' }, t('status.signin_heading')),
+          h('ol', {},
+            h('li', {}, ...withCode(t('status.signin_step_terminal'))),
+            h('li', {}, h('frontier-row', { wrap: true }, h('span', {}, t('status.signin_step_run')), h('code', {}, copy.signInCommand), copyButton)),
+            h('li', {}, ...withCode(t('status.signin_step_done'))),
+          ),
+          h('p', {}, h('small', {}, ...withCode(t('status.signin_alternative')))),
+          live,
         ),
-        h('p', {}, ...withCode(t('status.signin_alternative'))),
-        live,
       ),
     ),
   );
@@ -76,38 +71,44 @@ export function mountRuntimeStatus(context: ConfigurationContext, copy: StatusCo
 
   async function draw(): Promise<void> {
     const [workers, runtime] = await Promise.all([context.workers.list(), context.runtimes.get(context.applicationId)]);
-    workersSection.replaceChildren(h('h2', { id: 'workers-heading' }, t('status.workers_heading')));
+    const heading = h('h3', { id: 'workers-heading' }, t('status.workers_heading'));
     if (!workers.ok) {
-      workersSection.append(h('p', { role: 'alert' }, workers.message));
+      workersSection.replaceChildren(h('frontier-stack', { gap: '3' }, heading, h('div', { role: 'alert' }, workers.message)));
       return;
     }
     if (workers.value.length === 0) {
-      workersSection.append(h('div', { class: 'empty' },
-        h('h3', {}, t('status.no_workers_heading')),
+      workersSection.replaceChildren(h('frontier-stack', { gap: '3' }, heading, h('frontier-empty', {},
+        icon(workersIcon),
+        h('h4', {}, t('status.no_workers_heading')),
         h('p', {}, t('status.no_workers')),
-      ));
+        h('button', { type: 'button', onclick: () => redraw() }, t('status.check_again')),
+      )));
       return;
     }
     const rows = workers.value.map((worker) => rowFor(worker, runtime.ok ? runtime.value : null));
-    tableBody.replaceChildren(...rows.map((row) => h('tr', {},
-      h('th', { scope: 'row' }, row.worker.title()),
-      h('td', {},
-        h('span', { class: 'chip', 'data-tone': row.tone }, row.status),
-        row.reason ? h('p', { class: 'reason' }, ...withCode(row.reason)) : null,
+    workersSection.replaceChildren(h('frontier-stack', { gap: '3' },
+      heading,
+      h('table', {},
+        h('thead', {}, h('tr', {},
+          h('th', { scope: 'col' }, t('status.column_worker')),
+          h('th', { scope: 'col' }, t('status.column_status')),
+          h('th', { scope: 'col' }, t('status.column_models')),
+        )),
+        h('tbody', {}, ...rows.map((row) => h('tr', {},
+          h('th', { scope: 'row' }, row.worker.title()),
+          h('td', {},
+            h('frontier-stack', { gap: '1', align: 'start' },
+              h('frontier-badge', { 'data-tone': row.tone }, row.status),
+              row.reason ? h('small', {}, ...withCode(row.reason)) : null,
+            ),
+          ),
+          h('td', {}, row.models.length > 0
+            ? h('frontier-row', { wrap: true, gap: '1' }, ...row.models.map((label) => h('frontier-badge', {}, label)))
+            : h('small', { 'data-tone': 'muted' }, t('status.no_models'))),
+        ))),
       ),
-      h('td', {}, row.models.length > 0
-        ? h('ul', { class: 'models' }, ...row.models.map((label) => h('li', {}, label)))
-        : h('span', { class: 'reason' }, t('status.no_models'))),
-    )));
-    workersSection.append(h('table', {},
-      h('thead', {}, h('tr', {},
-        h('th', { scope: 'col' }, t('status.column_worker')),
-        h('th', { scope: 'col' }, t('status.column_status')),
-        h('th', { scope: 'col' }, t('status.column_models')),
-      )),
-      tableBody,
+      runtime.ok ? null : h('div', { role: 'alert' }, runtime.message),
     ));
-    if (!runtime.ok) workersSection.append(h('p', { role: 'alert' }, runtime.message));
   }
 
   let pending = false;

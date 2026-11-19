@@ -28,6 +28,7 @@
     "status.signin_step_done": "Choose the provider and sign in. Its models show here within a few minutes.",
     "status.signin_alternative": "A provider's key in the worker's environment, such as `ANTHROPIC_API_KEY`, works too once the worker is restarted.",
     "status.copy": "Copy command",
-    "status.copied": "Command copied."
+    "status.copied": "Command copied.",
+    "status.check_again": "Check again"
   }
 }
