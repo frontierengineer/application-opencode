@@ -29,6 +29,7 @@
     "status.signin_alternative": "A provider's key in the worker's environment, such as `ANTHROPIC_API_KEY`, works too once the worker is restarted.",
     "status.copy": "Copy command",
     "status.copied": "Command copied.",
-    "status.check_again": "Check again"
+    "status.check_again": "Check again",
+    "status.more_models": "{count} more models"
   }
 }

@@ -5,9 +5,10 @@ import { text } from './text.ts';
 // The Design System draws everything here; this only bounds the line length.
 const css = `
 .runtime-status { max-inline-size: 64rem; }
-.runtime-status td { vertical-align: top; }
+.runtime-status :is(th, td) { vertical-align: top; }
 `;
 
+const shownModels = 6;
 const workersIcon = 'M4 5h16v10H4zM8 19h8M12 15v4';
 
 export interface StatusCopy {
@@ -69,6 +70,18 @@ export function mountRuntimeStatus(context: ConfigurationContext, copy: StatusCo
     return { worker, tone: 'warning', status: t('status.not_ready'), reason: report.reason, models };
   }
 
+  // A worker can offer hundreds of models; the first few show, and the rest
+  // are a disclosure away.
+  function modelsCell(models: string[]): HTMLElement {
+    if (models.length === 0) return h('small', { 'data-tone': 'muted' }, t('status.no_models'));
+    const badges = (labels: string[]) => h('frontier-row', { wrap: true, gap: '1' }, ...labels.map((label) => h('frontier-badge', {}, label)));
+    if (models.length <= shownModels) return badges(models);
+    return h('frontier-stack', { gap: '1', align: 'start' },
+      badges(models.slice(0, shownModels)),
+      h('details', {}, h('summary', {}, t('status.more_models', { count: models.length - shownModels })), badges(models.slice(shownModels))),
+    );
+  }
+
   async function draw(): Promise<void> {
     const [workers, runtime] = await Promise.all([context.workers.list(), context.runtimes.get(context.applicationId)]);
     const heading = h('h3', { id: 'workers-heading' }, t('status.workers_heading'));
@@ -102,9 +115,7 @@ export function mountRuntimeStatus(context: ConfigurationContext, copy: StatusCo
               row.reason ? h('small', {}, ...withCode(row.reason)) : null,
             ),
           ),
-          h('td', {}, row.models.length > 0
-            ? h('frontier-row', { wrap: true, gap: '1' }, ...row.models.map((label) => h('frontier-badge', {}, label)))
-            : h('small', { 'data-tone': 'muted' }, t('status.no_models'))),
+          h('td', {}, modelsCell(row.models)),
         ))),
       ),
       runtime.ok ? null : h('div', { role: 'alert' }, runtime.message),
