@@ -1,5 +1,5 @@
 {
-  "id": "github.com/frontierengineer/opencode",
+  "id": "github.com/frontierengineer/application-opencode",
   "title": "OpenCode",
   "color": "#4c6ef5",
   "description": "Runs OpenCode as an agent on your workers. OpenCode works with its free models at once, and with your own model providers once you sign in to them on a worker.",

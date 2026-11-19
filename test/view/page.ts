@@ -18,7 +18,7 @@ const runtimeHandlers: ((change: { id: string; kind: string }) => void)[] = [];
 const clipboard: string[] = [];
 
 const context = {
-  applicationId: 'github.com/frontierengineer/opencode',
+  applicationId: 'github.com/frontierengineer/application-opencode',
   translate: (token: string) => (translations.en as Record<string, string>)[token] ?? token,
   workers: {
     list: async () => ok(workers.map((worker) => ({ id: worker.id, title: () => worker.title, isConnected: () => worker.connected }))),
@@ -39,6 +39,6 @@ Object.assign(window, {
   mountView: () => registration.configuration.mount(context),
   signIn: (workerId: string) => {
     reports[workerId] = { workerId, ready: true, reason: null, models: [] };
-    for (const handler of runtimeHandlers) handler({ id: 'github.com/frontierengineer/opencode', kind: 'changed' });
+    for (const handler of runtimeHandlers) handler({ id: 'github.com/frontierengineer/application-opencode', kind: 'changed' });
   },
 });

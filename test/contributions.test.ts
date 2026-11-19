@@ -31,6 +31,14 @@ test('the id, title and color are what the interface allows', () => {
   assert.ok(contributions.title.length > 0);
 });
 
+test('the id, the package name and the repository name the same Application', () => {
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { name: string; license: string; repository: { url: string } };
+  assert.equal(contributions.id, `github.com/frontierengineer/${pkg.name}`);
+  assert.equal(pkg.repository.url, `git+https://${contributions.id}.git`);
+  assert.equal(pkg.license, 'MIT');
+  assert.ok(existsSync(join(root, 'package-lock.json')), 'package.json comes with package-lock.json');
+});
+
 test('every bundle implements exactly what the contributions declare', async () => {
   const surface = await bundle('surface');
   const host = await bundle('host');
