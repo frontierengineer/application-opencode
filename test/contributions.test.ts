@@ -46,8 +46,12 @@ test('every bundle implements exactly what the contributions declare', async () 
   const declaredSurface = contributions.surface ?? {};
   const declaredHost = contributions.host ?? {};
   const declaredWorker = contributions.worker ?? {};
-  for (const singular of ['desktop', 'panel', 'display', 'configuration'] as const) {
-    assert.equal(singular in declaredSurface, !!surface && singular in surface, `surface ${singular}`);
+  assert.equal('configuration' in declaredSurface, !!surface && 'configuration' in surface, 'surface configuration');
+  assert.deepEqual(keys(surface?.panels), ids(declaredSurface.panels), 'surface panels');
+  for (const panel of declaredSurface.panels ?? []) {
+    assert.ok(Number.isInteger(panel.minWidth) && panel.minWidth >= 1, `panel ${panel.id} minWidth`);
+    assert.ok(Number.isInteger(panel.minHeight) && panel.minHeight >= 1, `panel ${panel.id} minHeight`);
+    for (const input of panel.inputs ?? []) assert.ok(['pointer', 'touch', 'keyboard'].includes(input), `panel ${panel.id} input ${input}`);
   }
   assert.deepEqual(keys(surface?.actions), ids(declaredSurface.actions), 'surface actions');
   assert.deepEqual(keys(surface?.optionSources), ids(declaredSurface.optionSources), 'surface option sources');
