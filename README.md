@@ -85,7 +85,7 @@ it keeps a screenshot of each.
 To try it in Frontier itself, put this repository in the `applications`
 directory beside a Frontier checkout, as `opencode`; a Source Build of that
 checkout carries every Application there as an Initial Application, so a new
-install starts with it. From the checkout, `bash modcon/scripts/tool.sh ui
+installation starts with it. From the checkout, `bash modcon/scripts/tool.sh ui
 --remake --applications <that directory>` makes the Electron app with them and
 photographs it.
 
