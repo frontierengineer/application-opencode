@@ -12,13 +12,17 @@ import type {
   Unavailable,
 } from '../../application';
 import { launchConfig, merge } from './config.ts';
-import { Installer, npmInstall } from './installer.ts';
+import { type InstallOutcome, Installer, npmInstall } from './installer.ts';
 import { type Command, type Machine, firstExecutable, homeOf, lastLines, nodeAware, realMachine, run, which } from './machine.ts';
 import { parseModels, toRuntimeModels } from './models.ts';
 import { failure, text } from './text.ts';
+import { judgeVersion } from './version.ts';
 
 export const agentPackage = 'opencode-ai';
 export const agentVersion = '1.19.6';
+// An OpenCode the person installed older than this, or of another major
+// version, is passed over for the one installed at agentVersion.
+export const agentMinimum = '1.19.6';
 
 const refreshAfterMilliseconds = 12 * 60 * 60 * 1000;
 const retryRefreshAfterMilliseconds = 10 * 60 * 1000;
@@ -63,10 +67,34 @@ export function createOpenCodeRuntime(context: RuntimeContext, machine: Machine 
     return { command: await nodeAware(machine, path), path };
   }
 
+  let said = '';
+  function say(key: string, message: string, fields: Record<string, string>): void {
+    if (key === said) return;
+    said = key;
+    void context.logger.info(message, fields);
+  }
+
   async function locate(): Promise<Binary | null> {
     const found = (await which(machine, 'opencode')) ?? (await firstExecutable([join(homeOf(machine), '.opencode', 'bin', 'opencode')]));
-    if (found) return { command: await nodeAware(machine, found), path: found };
-    return privateBinary();
+    let passedOver = '';
+    if (found) {
+      const own: Binary = { command: await nodeAware(machine, found), path: found };
+      const checked = await check(own);
+      const verdict = checked.problem === null ? judgeVersion(checked.version, agentMinimum) : null;
+      if (verdict?.usable) {
+        say(`own ${found} ${checked.version}`, t('log.own', { version: checked.version ?? '', path: found }), { path: found, version: checked.version ?? '' });
+        return own;
+      }
+      const values = { version: checked.version ?? '', path: found, minimum: agentMinimum, reason: checked.problem ?? '' };
+      passedOver = verdict === null ? t('log.passed_over_broken', values)
+        : verdict.why === 'older' ? t('log.passed_over_older', values)
+          : verdict.why === 'newer_major' ? t('log.passed_over_newer_major', values)
+            : t('log.passed_over_unknown', values);
+    }
+    const installed = await privateBinary();
+    if (installed) say(`private ${installed.path} ${passedOver}`, [t('log.private', { version: agentVersion }), passedOver].filter(Boolean).join(' '), { path: installed.path, version: agentVersion });
+    else if (passedOver) say(`none ${passedOver}`, passedOver, { path: found ?? '' });
+    return installed;
   }
 
   async function check(binary: Binary): Promise<{ version: string | null; problem: string | null }> {
@@ -145,11 +173,17 @@ export function createOpenCodeRuntime(context: RuntimeContext, machine: Machine 
     }
   }
 
+  function installReason(outcome: Extract<InstallOutcome, { ok: false }>): string {
+    if (!outcome.unreached) return outcome.reason;
+    const { host, code, certificate } = outcome.unreached;
+    return t(certificate ? 'install.untrusted_certificate' : 'install.unreachable', { host, code });
+  }
+
   async function install(): Promise<void | Failure | Unavailable> {
     const outcome = await installer.run(async () => {
       await mkdir(prefix, { recursive: true });
       const installed = await npmInstall(machine, prefix, `${agentPackage}@${agentVersion}`);
-      if (!installed.ok) return installed;
+      if (!installed.ok) return { ok: false, reason: installReason(installed) };
       if (!(await privateBinary())) return { ok: false, reason: t('install.not_found_after') };
       return { ok: true };
     });

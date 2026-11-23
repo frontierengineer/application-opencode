@@ -18,11 +18,17 @@ sign-in.
 On every worker, the worker bundle:
 
 - **Probes** whether OpenCode is there and starts, and which models it offers.
-  An `opencode` on the PATH or in `~/.opencode/bin` is used as it is.
+  An `opencode` on the PATH or in `~/.opencode/bin` is used as it is when it
+  starts, is at least the minimum version (`agentMinimum` in `src/runtime.ts`)
+  and is of the same major version; the log says which OpenCode runs, and why
+  the person's was passed over.
 - **Installs** `opencode-ai`, at the version this Application pins, into its own
-  directory on the worker with npm when no OpenCode is found. npm is given 10
-  minutes; a failed or stalled install is tried again after 1, 4, 16, then every
-  60 minutes, and its reason shows meanwhile.
+  directory on the worker with npm when no usable OpenCode is found: the npm
+  beside the Node that runs the worker, which a Frontier build carries, else the
+  PATH's. npm is given 10 minutes; a failed or stalled install is tried again
+  after 1, 4, 16, then every 60 minutes, and its reason shows meanwhile. A
+  registry the worker cannot reach is named as unreachable, and a firewall's
+  certificate npm does not trust is said as such.
 - **Lists models** with `opencode models --verbose` in the background, again
   whenever the sign-ins change and otherwise every 12 hours. Models are grouped
   by provider and family, newest first, each with its context window and its
@@ -57,7 +63,7 @@ appearance.
 | `src/config.ts` | The session's model, variant and agent definition as OpenCode config. |
 | `src/models.ts` | Reading `opencode models` into the interface's models. |
 | `src/definition.ts` | Reading an agent definition's front matter. |
-| `src/installer.ts`, `src/machine.ts` | Finding npm, running installs once at a time, and running processes with a deadline. |
+| `src/installer.ts`, `src/machine.ts`, `src/version.ts` | Finding npm, running installs once at a time and naming a registry that cannot be reached, running processes with a deadline, and judging the version of an OpenCode the person installed. |
 | `surface.ts`, `src/status-view.ts` | The configuration view. |
 | `translations.json` | Every message a person reads, by token. |
 | `test/` | Unit tests, with a fake npm and a fake `opencode` that speaks ACP, and a browser test of the configuration view. |

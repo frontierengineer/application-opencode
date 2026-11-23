@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,13 +25,18 @@ export function harness(): Harness {
   const home = join(base, 'home');
   const fakeBin = join(base, 'bin');
   for (const directory of [home, fakeBin, join(base, 'private'), join(base, 'scratch')]) mkdirSync(directory, { recursive: true });
-  writeFileSync(join(fakeBin, 'npm'), `#!/bin/sh\nexec "${process.execPath}" "${join(here, 'fixtures', 'fake-npm.mjs')}" "$@"\n`);
+  const carried = join(base, 'node', 'bin');
+  mkdirSync(carried, { recursive: true });
+  symlinkSync(process.execPath, join(carried, 'node'));
+  writeFileSync(join(carried, 'npm'), `#!/bin/sh\nexec "${process.execPath}" "${join(here, 'fixtures', 'fake-npm.mjs')}" "$@"\n`);
+  chmodSync(join(carried, 'npm'), 0o755);
+  writeFileSync(join(fakeBin, 'npm'), '#!/bin/sh\necho "the PATH\'s npm was run" >&2\nexit 1\n');
   chmodSync(join(fakeBin, 'npm'), 0o755);
   let clock = Date.parse('2026-11-17T12:00:00Z');
   const machine: Machine = {
     env: { PATH: `${fakeBin}:/usr/bin:/bin`, HOME: home },
     platform: 'linux',
-    execPath: process.execPath,
+    execPath: join(carried, 'node'),
     now: () => clock,
   };
   const spawned: SpawnAgentOptions[] = [];

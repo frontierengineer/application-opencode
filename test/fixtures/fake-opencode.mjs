@@ -4,7 +4,7 @@ if (process.env.FAKE_OPENCODE_BROKEN) {
   process.exit(127);
 }
 if (command === '--version') {
-  process.stdout.write('1.19.6\n');
+  process.stdout.write(`${process.env.FAKE_OPENCODE_VERSION ?? '1.19.6'}\n`);
   process.exit(0);
 }
 if (command === 'models') {

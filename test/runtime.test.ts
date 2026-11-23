@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import type { Failure, LaunchedAgent, RuntimeLaunchInput, RuntimeProbe } from '../../application';
 import { agentVersion, createOpenCodeRuntime } from '../src/runtime.ts';
 import { launchConfig } from '../src/config.ts';
@@ -88,18 +88,65 @@ test('a failed install is reported and waits before it is tried again', async ()
   assert.equal(probeOf(await runtime.probe()).missing, true);
 });
 
-test('an OpenCode the person installed is used, from the PATH or from its own installer', async () => {
+function ownOpenCode(h: ReturnType<typeof harness>, directory: string, prefix = ''): string {
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, 'opencode'), `#!/bin/sh\n${prefix}exec "${process.execPath}" "${new URL('./fixtures/fake-opencode.mjs', import.meta.url).pathname}" "$@"\n`);
+  chmodSync(join(directory, 'opencode'), 0o755);
+  return join(directory, 'opencode');
+}
+
+test('an OpenCode the person installed is used, from the PATH or from its own installer, and the log says which runs', async () => {
   const h = harness();
-  const own = join(h.home, '.opencode', 'bin');
-  mkdirSync(own, { recursive: true });
-  writeFileSync(join(own, 'opencode'), `#!/bin/sh\nexec "${process.execPath}" "${new URL('./fixtures/fake-opencode.mjs', import.meta.url).pathname}" "$@"\n`);
-  chmodSync(join(own, 'opencode'), 0o755);
+  const own = ownOpenCode(h, join(h.home, '.opencode', 'bin'), 'FAKE_OPENCODE_VERSION=1.20.3 ');
   const runtime = createOpenCodeRuntime(h.context, h.machine);
   assert.equal(probeOf(await runtime.probe()).ready, true);
   const launched = (await runtime.launch(launchInput(h.home))) as LaunchedAgent;
-  assert.equal(h.spawned[0]?.command, join(own, 'opencode'));
+  assert.equal(h.spawned[0]?.command, own);
   assert.deepEqual(h.spawned[0]?.args, ['acp']);
   await launched.stop();
+  assert.deepEqual(h.logs.filter(({ message }) => message.startsWith('OpenCode 1')).map(({ message }) => message), [`OpenCode 1.20.3 runs as the person installed it, at ${own}.`]);
+});
+
+test("an OpenCode the person installed that is too old, of another major version or does not start is passed over for the pinned one, and the log says why", async () => {
+  for (const [prefix, why] of [
+    ['FAKE_OPENCODE_VERSION=1.4.0 ', 'is 1.4.0, older than 1.19.6'],
+    ['FAKE_OPENCODE_VERSION=2.0.1 ', 'is 2.0.1, a major version after 1.19.6 that Frontier has not been tested with'],
+    ['FAKE_OPENCODE_BROKEN=1 ', 'does not start (error while loading shared libraries: libstdc++.so.6)'],
+  ] as const) {
+    const h = harness();
+    const own = ownOpenCode(h, join(h.base, 'person-bin'), prefix);
+    h.machine.env.PATH = `${join(h.base, 'person-bin')}:${h.machine.env.PATH}`;
+    const runtime = createOpenCodeRuntime(h.context, h.machine);
+    assert.equal(probeOf(await runtime.probe()).missing, true);
+    assert.equal(await runtime.install(), undefined);
+    assert.equal(probeOf(await runtime.probe()).ready, true);
+    const launched = (await runtime.launch(launchInput(h.home))) as LaunchedAgent;
+    assert.equal(h.spawned[0]?.command, join(h.base, 'private', 'agent', 'node_modules', 'opencode-ai', 'bin', 'opencode'));
+    await launched.stop();
+    const said = h.logs.filter(({ message }) => message.includes(own) || message.startsWith('OpenCode 1')).map(({ message }) => message);
+    assert.equal(said.length, 2, said.join('\n'));
+    assert.equal(said[0], `The OpenCode at ${own} ${why}, so it is not used.`);
+    assert.equal(said[1], `OpenCode 1.19.6 runs, installed by Frontier. The OpenCode at ${own} ${why}, so it is not used.`);
+  }
+});
+
+test('an install that cannot reach the registry, or reaches it through an untrusted certificate, says so', async () => {
+  const h = harness();
+  const runtime = createOpenCodeRuntime(h.context, h.machine);
+  h.machine.env.FAKE_NPM_FAIL = 'network';
+  assert.equal(failureOf(await runtime.install()).message, "Installing OpenCode did not finish: this worker can't reach registry.npmjs.org (EAI_AGAIN), so npm cannot download OpenCode. Check the worker's network connection, and its proxy if it needs one: npm reads HTTPS_PROXY and its own `proxy` setting.");
+  assert.match(probeOf(await runtime.probe()).reason ?? '', /^Installing OpenCode on this worker did not finish: this worker can't reach registry\.npmjs\.org/);
+  h.advance(2 * 60 * 60_000);
+  h.machine.env.FAKE_NPM_FAIL = 'certificate';
+  assert.match(failureOf(await runtime.install()).message, /this worker reaches registry\.npmjs\.org only through a certificate npm does not trust \(UNABLE_TO_GET_ISSUER_CERT_LOCALLY\)/);
+});
+
+test("the npm beside the worker's Node is used before the PATH's, and the PATH's when there is none beside it", async () => {
+  const h = harness();
+  assert.equal(await createOpenCodeRuntime(h.context, h.machine).install(), undefined);
+  const elsewhere = harness();
+  rmSync(join(dirname(elsewhere.machine.execPath), 'npm'));
+  assert.match(failureOf(await createOpenCodeRuntime(elsewhere.context, elsewhere.machine).install()).message, /the PATH's npm was run/);
 });
 
 test('launch runs opencode acp in the session directory with the model, variant and agent definition as config', async () => {
